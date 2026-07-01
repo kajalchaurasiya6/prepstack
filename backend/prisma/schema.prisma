@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuestionType {
+  THEORY
+  CODING
+  MCQ
+}
+
+enum EvaluationMethod {
+  RULE_BASED
+  OLLAMA
+  OPENAI
+}
+
+model User {
+  id               String            @id @default(uuid())
+  username         String            @unique
+  email            String            @unique
+  passwordHash     String            @map("password_hash")
+  avatarUrl        String?           @map("avatar_url")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  bookmarks        Bookmark[]
+  notes            Note[]
+  mockInterviews   MockInterview[]
+  questionAttempts QuestionAttempt[]
+  lastLoginAt      DateTime?         @map("last_login_at")
+
+  @@map("users")
+}
+
+model Topic {
+  id             String          @id @default(uuid())
+  name           String          @unique
+  slug           String          @unique
+  description    String
+  icon           String?
+  questions      Question[]
+  createdAt      DateTime        @default(now()) @map("created_at")
+    mockInterviewTopics MockInterviewTopic[]
+  @@map("topics")
+}
+
+model Question {
+  id               String            @id @default(uuid())
+  title            String
+  description      String            @db.Text
+  questionType     QuestionType      @map("question_type")
+  difficulty       Difficulty
+  solution         String            @db.Text
+  hints            String?           @db.Text
+  topicId          String            @map("topic_id")
+  bookmarks        Bookmark[]
+  notes            Note[]
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  topic            Topic             @relation(fields: [topicId], references: [id])
+  questionAttempts QuestionAttempt[]
+
+  @@index([topicId])
+  @@map("questions")
+}
+
+model QuestionAttempt {
+  id               String            @id @default(uuid())
+
+  userId           String            @map("user_id")
+  questionId       String            @map("question_id")
+
+  submittedAnswer  String            @db.Text @map("submitted_answer")
+
+  score            Int?
+  feedback         String?           @db.Text
+  strengths        String?           @db.Text
+  improvements     String?           @db.Text
+
+  evaluationMethod EvaluationMethod?
+
+  attemptedAt      DateTime          @default(now()) @map("attempted_at")
+
+  user             User              @relation(fields: [userId], references: [id])
+  question         Question          @relation(fields: [questionId], references: [id])
+
+  mockInterviewQuestions MockInterviewQuestion[]
+
+  @@index([userId])
+  @@index([questionId])
+
+  @@map("question_attempts")
+}
+
+model Bookmark {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  questionId String   @map("question_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id])
+  question   Question @relation(fields: [questionId], references: [id])
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@map("bookmarks")
+}
+
+model Note {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  questionId String   @map("question_id")
+  content    String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  user       User     @relation(fields: [userId], references: [id])
+  question   Question @relation(fields: [questionId], references: [id])
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@map("notes")
+}
+
+model MockInterview {
+  id                     String                  @id @default(uuid())
+  userId                 String                  @map("user_id")
+  score                  Int?                    @map("score")
+  totalQuestions         Int                     @map("total_questions")
+  mockInterviewQuestions MockInterviewQuestion[]
+  difficulty             Difficulty
+  feedback               String?                 @db.Text
+  strengths              String?                 @db.Text
+  improvements           String?                 @db.Text
+  evaluationMethod       EvaluationMethod?       @map("evaluation_method")
+  startedAt              DateTime                @default(now()) @map("started_at")
+  completedAt            DateTime?               @map("completed_at")
+  user                   User                    @relation(fields: [userId], references: [id])
+  topics MockInterviewTopic[]
+  @@index([userId])
+  @@map("mock_interviews")
+}
+
+model MockInterviewQuestion {
+  id String @id @default(uuid())
+
+  mockInterviewId   String @map("mock_interview_id")
+  questionAttemptId String @map("question_attempt_id")
+
+  questionOrder Int @map("question_order")
+
+  mockInterview   MockInterview   @relation(fields: [mockInterviewId], references: [id])
+  questionAttempt QuestionAttempt @relation(fields: [questionAttemptId], references: [id])
+
+  @@unique([mockInterviewId, questionOrder])
+  @@index([mockInterviewId])
+  @@index([questionAttemptId])
+  @@map("mock_interview_questions")
+}
+model MockInterviewTopic {
+  mockInterviewId String @map("mock_interview_id")
+  topicId         String @map("topic_id")
+
+  mockInterview   MockInterview @relation(fields: [mockInterviewId], references: [id])
+  topic           Topic         @relation(fields: [topicId], references: [id])
+
+  @@id([mockInterviewId, topicId])
+
+  @@map("mock_interview_topics")
+}
